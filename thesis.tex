@@ -11,6 +11,21 @@
 								% use single spacing for tables, etc.
 \usepackage{calc}
 
+\usepackage{graphicx}
+\usepackage{color}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{latexsym}
+\usepackage{amsmath}
+\usepackage{makecell}
+
+\newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcommand{\td}[1]{#1\textdagger}
+
 % For the signature boxes and much better looking tables
 \usepackage{array} % Also for better arrays (eg matrices) in maths
 \usepackage{tabularx}
@@ -76,6 +91,8 @@
 
 % Other packages that are not needed for the template, but I highly recommend (and all of your own packages go here to)
 % Add them one by one to make sure they do not interfere, for instance the package subfigure clashes with this template
+\usepackage{caption}
+\usepackage{subcaption}
 \usepackage{amssymb}
 \usepackage{amsfonts}
 \usepackage{amsmath}
@@ -85,6 +102,7 @@
 \usepackage{tabularx}
 \usepackage{longtable}
 \usepackage{rotating}
+\usepackage[]{pagecolor}
 % \usepackage{xtab}               % collides on tablehead with glossaries
 \usepackage{paralist} % very flexible & customizable lists (eg. enumerate/itemize, etc.)
 \usepackage{verbatim}
@@ -92,7 +110,7 @@
 
 % FOR ADDING LINE NO. I have checked, this does not mess with margins (i.e. the # appears outside the margins, so no new orphans/widows are introduced)
 \usepackage{lineno}
-\linenumbers
+%\linenumbers
 
 %% TO TURN ON BIB FOR CHAPTER (when compiling chapters separately)
 % \def\biblio{\bibliographystyle{abbrvnat}\bibliography{thesis}}
@@ -106,6 +124,7 @@
 %%% BEGIN DOCUMENT
 
 \begin{document}
+%\pagecolor{white}
 % Making tables and figures numbered continuously
 \makeatletter
 \@removefromreset{table}{chapter}
@@ -119,21 +138,23 @@
 \def\sym#1{\ifmmode^{#1}\else\(^{#1}\)\fi} % Defining stars for significance tables
 
 % Defining variables to be used throughout the document for personalization
-\def\mytitle{THESIS TITLE} % Make sure this is in all caps
-\def\myauthor{My Name}
-\def\myauthorfull{My Full Name}
-\def\mysupervisorname{Advisor Name}
+\def\mytitle{TOWARDS A PRACTICALLY USEFUL TEXT SIMPLIFICATION SYSTEM} % Make sure this is in all caps
+\def\myauthor{Reno Kriz}
+\def\myauthorfull{Reno Joseph Kriz}
+\def\mysupervisorname{Chris Callison-Burch}
 \def\mysupervisortitle{Professor of Computer and Information Science}
+\def\mysecondsupervisorname{Marianna Apidianaki}
+\def\mysecondsupervisortitle{Senior Researcher, University of Helsinki; \\ Adjunct Faculty Member of Computer and Information Science}
 \newlength{\superlen}   % a "scratch" length
 \settowidth{\superlen}{\mysupervisorname, \mysupervisortitle} % Width of signature line for supervisor
-\def\gradchairname{Grad Chair Name}
+\def\gradchairname{Mayur Naik}
 \def\gradchairtitle{Professor of Computer and Information Science}
 \newlength{\chairlen}   % a "scratch" length
 \settowidth{\chairlen}{\gradchairname, \gradchairtitle} % Width of signature line for supervisor
 \newlength{\maxlen}
 \setlength{\maxlen}{\maxof{\superlen}{\chairlen}}
 \def\mydepartment{Computer and Information Science}
-\def\myyear{20XX}
+\def\myyear{2021}
 \def\signatures{46 pt} % Space to accommodate the signatures, you can fiddle with this as you like
 
 %% PRELIMINARY PAGES
@@ -173,41 +194,41 @@ Degree of Doctor of Philosophy
 
 \end{center}
 
-\vfill % Here to make sure the page is filled
-
+%\vfill % Here to make sure the page is filled
 \begin{flushleft}
-
-Supervisor of Dissertation\\[\signatures] % Space for signature, you can fiddle with this as you like
-
+Supervisors of Dissertation % Space for signature, you can fiddle with this as you like
 \renewcommand{\tabcolsep}{0 pt}
 \begin{table}[h]
 \begin{tabularx}{\maxlen}{l}
-\toprule
-\mysupervisorname, \mysupervisortitle\\ %Space between advisor and graduate chair, you can fiddle with this as you like
+\\\\ \toprule
+\mysupervisorname, \mysupervisortitle %Space between advisor and graduate chair, you can fiddle with this as you like
+\end{tabularx}
+\end{table}
+\begin{table}[h]
+\begin{tabularx}{\maxlen}{l}
+\\ \toprule
+\mysecondsupervisorname, \mysecondsupervisortitle %Space between advisor and graduate chair, you can fiddle with this as you like
 \end{tabularx}
 \end{table}
 
-Graduate Group Chairperson\\[\signatures] % Space for signature, you can fiddle with this as you likee
-
+Graduate Group Chairperson % Space for signature, you can fiddle with this as you likee
 \begin{table}[h]
 \begin{tabularx}{\maxlen}{l}
-\toprule
+\\ \toprule
 \gradchairname, \gradchairtitle\\ %Space between advisor and graduate chair, you can fiddle with this as you like
 \end{tabularx}
 \end{table}
+\vspace{-6mm}
 \singlespacing
-
 Dissertation Committee % No signature necessary
 
-Person Name1, Title
+Mitch Marcus, Professor of Computer and Information Science
 
-Person Name2, Title
+Lyle Ungar, Professor of Computer and Information Science
 
-Person Name3, Title
+Dan Roth, Professor of Computer and Information Science
 
-Person Name4, Title
-
-Person Name5, Title
+Eleni Miltsakaki, Senior Researcher (external member)
 
 \end{flushleft}
 
@@ -249,17 +270,21 @@ To view a copy of this license, visit
 \begin{preliminary}
 
 % DEDICATION (OPTIONAL)
+\begin{comment}
 \setcounter{page}{3}  %Makes this page Roman numeral 3. Thanks to Albert Zevelev.
 \begin{center}
 \textit{Dedicated to (optional)}
 \end{center}
+\end{comment}
 
 % ACKNOWLEDGEMENT (OPTIONAL)
 
+\begin{comment}
 \clearpage
 \chapter*{ACKNOWLEDGEMENT}
 \addcontentsline{toc}{chapter}{ACKNOWLEDGEMENT} % This is to include this section in the Table of Contents
 \input{acknowledgement}
+\end{comment}
 
 % ABSTRACT
 
@@ -271,7 +296,7 @@ To view a copy of this license, visit
 
 \myauthor
 
-\mysupervisorname
+\mysupervisorname \text{ }and \mysecondsupervisorname
 
 \end{center}
 
@@ -319,9 +344,15 @@ To view a copy of this license, visit
 
 \subfile{introduction.tex}  
 
-\subfile{chapter1/chapter1.tex}
-
 \subfile{chapter2/chapter2.tex}
+
+\subfile{chapter3/chapter3.tex}
+
+\subfile{chapter4/chapter4.tex}
+
+\subfile{chapter5/chapter5.tex}
+
+\subfile{chapter6/chapter6.tex}
 
 \subfile{conclusion.tex}
 
@@ -351,6 +382,7 @@ To view a copy of this license, visit
 \titleformat{\chapter}[hang]{\large\center}{GLOSSARY}{0 pt}{} % Old {APPENDIX \thechapter}{0 pt}{ : }
 \titlespacing*{\chapter}{0pt}{-33 pt}{6 pt} % The key value here is the -33 pts, I got to it by old fashioned measuring with a ruler....
 
+\begin{comment}
 \begin{glossaryf}
 \addtocontents{toc}{\protect\setcounter{tocdepth}{-1}} % This is to fix how appendices are shown in ToC
 \clearpage
@@ -359,6 +391,7 @@ To view a copy of this license, visit
 \addcontentsline{toc}{chapter}{GLOSSARY} % You have to write here everything you want the ToC to show including \thechapter if you want numbering
 \subfile{glossary}
 \end{glossaryf}
+\end{comment}
 
 
 %% BIBLIOGRAPHY

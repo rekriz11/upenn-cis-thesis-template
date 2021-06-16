@@ -1,0 +1,241 @@
+\documentclass[thesis.tex]{subfiles}
+\begin{document}
+\chapter{Simplification Using Paraphrases and \\ Context-based Lexical Substitution}
+\label{chap:lexical}
+
+\section{Introduction}
+\input{chapter3/intro}
+
+\section{Complex Word Identification}
+
+\noindent The first step for lexical simplification is to identify the complex words that should be simplified. 
+To accomplish this task, \cite{shardlow2013cw} proposed several features that help to determine whether a word is complex, including word length, number of syllables, word frequency, number of unique WordNet synsets and synonyms. We also leverage these features in this work. For word frequency, \cite{shardlow2013cw} used frequency counts collected from SUBTLEX, a corpus of 51 million words extracted from English subtitles.\footnote{SUBTLEX can be found at: \\ https://www.ugent.be/pp/experimentele-psychologie/en/research/documents/subtlexus}. In contrast, we use word-level  frequencies from the Google Web1T corpus \citep{thorsten2006web} (henceforth Google $n$-gram), as this is significantly larger and contains texts across many genres and time periods, making it more suitable for extracting general word frequency information. 
+
+We add to these features from previous workbinary Part-of-Speech (POS) features and Word2Vec embeddings \citep{mikolov2013efficient}. Embeddings in particular are important as they can serve to capture the context in which a word is typically found, and a word's complexity can often be influenced by its context. Following this intuition, we additionally include several explicit context-based features: average length of words in the sentence, average number of syllables, average word frequency, average number of WordNet synsets and synonyms, and sentence length. We train Support Vector Machine (SVM) classifiers using these features.
+
+The experiments from our initial work on complex word identification occurred prior to the rise of large-scale pre-trained language models. Thus, as a sanity check, we now present two additional models that show how recent improvements in NLP can help with our task. Specifically, we train two models. First, we fine-tune RoBERTa \citep{liu2019roberta} using only a single word and a binary label indicating complexity. We expect that this model would not work that well, because the main idea of BERT-based embeddings is that they are \textit{contextual}, but this initial approach does not take advantage of this. Thus, in order to more effectively leverage contextual embeddings, we also fine-tune RoBERTa with both the word and the sentence it originally came from concatenated together. Specifically, the input to this model looks as follows:
+
+\begin{center}
+[CLS] \textless \textit{word}\textgreater \text{ }[SEP] \textless \textit{sentence-containing-word}\textgreater \text{ }[SEP]
+\end{center}
+
+\begin{table}
+    \centering
+    \begin{tabular}{|cc|c|l|}
+  	\hline
+   & \bf Annotators & \bf Prevalence & \bf Example Words \\ \hline
+    least complex & 0 & 0.617 & heard, sat, feet, shops, town \\
+    & 1 & 0.118 & protests, pump, trial \\
+    & 2 & 0.062 & sentenced, fraction, primary \\
+    & 3 & 0.047 & measures, involved, elite \\ 
+    & 4 & 0.035 & fore, pact, collapsed \\
+    & 5 & 0.031 & slew, enrolled, widespread \\
+    & 6 & 0.029 & edible, seize, dwindled \\
+    & 7 & 0.023 & perilous, activist, remorse \\ 
+    & 8 & 0.023 & vintners, adherents, amassed \\
+    most complex & 9 & 0.015 & abdicate, detained, liaison \\ \hline
+   \end{tabular}
+   \caption{Examples of words identified as complex (i.e. difficult to understand within a text) by $n$ annotators, where $0 \leq n \leq 9$. Column 2 (Prevalence) shows the proportion of the total number of words identified as complex by $n$ annotators.}
+   \label{tab:cw_turk_examples}
+\end{table}
+
+\subsection{Complex Word Identification Data}
+
+We present a new corpus with complexity annotations for training and testing our models. We hired annotators on Amazon Mechanical Turk; their task consisted of identifying complex words in the context of given texts. We randomly selected 200 texts from the Newsela corpus \citep{xu2015problems}, and had the first 200 tokens from each text labeled by nine annotators. We pre-process the texts using the Stanford CoreNLP suite \citep{manning2014stanford} for tokenization, lemmatization, POS tagging, and named entity recognition. The annotators were instructed to label at least 10 complex words they deemed worth simplifying for young children, people with disabilities, and second language learners. After filtering out stop words (articles, conjunctions, prepositions, pronouns) and named entities, we are left with 17,318 labeled tokens. For our binary classification task, tokens labeled by at least three annotators are considered to be complex, and tokens labeled by less than three annotators are considered to be ``simple". This increases the likelihood of complex segments being actually complex; as we can see from Table \ref{tab:cw_turk_examples}, tokens identified by only one or two annotators tend to be quite simple.
+
+Datasets for training and evaluating Complex Word Identification (CWI) systems were created and released in the SemEval 2016 competition \citep{paetzold2016semeval} but we decided not to use them for several reasons. Although this was a CWI task, surprisingly only 4.7\% of the words in the test data were identified as complex, and all the other words were viewed as simple. As a consequence, none of the systems that participated in the SemEval task managed to beat the accuracy of the ``All Simple" baseline which labeled all words in the test set as simple (0.953). 
+As noted by \cite{paetzold2016semeval}, the inverse problem is present in the corpus developed by \cite{shardlow2013cw}, where the ``All Complex" baseline achieved higher accuracy, recall and F-scores than all other tested systems, suggesting that marking all words in a sentence as complex is the most effective approach for CWI.
+
+Another problem in the SemEval-2016 dataset is that although the number of complex words is much higher in the training data (32\%), 18\% of all words were annotated as complex by only one out of 20 annotators and considered as complex. In addition to the highly different number of complex words in the training and test data, the two datasets are also imbalanced in terms of size, with only 2,237 training instances and 88,211 testing instances. These factors make this dataset a dubious choice for system training and evaluation. Comparison to the participating systems is also extremely difficult, since the best systems are ones that label most of the data as simple. 
+
+\subsection{Complex Word Identification Experiments and Results}
+
+We compare the performance of three SVM classifiers trained with different feature sets; one classifier trained with only word-based features (\textbf{SVM Word}), one trained with both word- and context-based features (\textbf{SVM Word+Context}); and a third was trained with word, context, POS, and embedding features (\textbf{SVM-ALL}). We compare our models to two simple baselines: \textbf{Word Length}, where we simply threshold for word length in characters, considering longer words as complex; the length threshold with the best performance was 7; and \textbf{$n$-gram Frequency}: thresholding for word frequency using Google $n$-gram counts, considering more frequent words as simple; the frequency threshold with the best performance was 19,950,000. In addition, we compare our approaches to two fine-tuned models: \textbf{RoBERTa Word}, where we fine-tune RoBERTa using just word-level information; and \textbf{RoBERTa Word+Context}, where we fine-tune RoBERTa using both the word and the sentence from which it came.
+
+\begin{table*}
+	\small
+	\centering
+	\begin{tabular}{|c||c|c|c|c|}
+		\hline \bf Model & \bf Precision & \bf Recall & \bf F-Score \\ \hline
+Word Length & 0.595 & 0.802 & 0.683 \\
+$n$-gram Frequency & 0.432 & \textbf{1.0} & 0.603 \\ \hline
+SVM-Word & 0.787 & 0.724 & 0.754 \\
+SVM-Word+Context & 0.789 & 0.731 & 0.759 \\ 
+SVM-ALL & 0.784 & 0.759 & 0.771 \\ \hline 
+RoBERTa-Word & 0.785 & 0.706 & 0.743 \\ 
+RoBERTa-Word+Context & \textbf{0.803} & 0.849 & \textbf{0.825} \\ \hline
+	\end{tabular}
+	\caption{Cross-validation performance for three complex word identification classifiers, along with comparisons to three baselines. Scores are calculated using \textbf{unique} words in our training data.}
+	\label{tab:cwi}
+\end{table*}
+
+The results of this experiment are shown in Table \ref{tab:cwi}. While $n$-gram Frequency baselines have higher recall, both our models show substantial improvements in terms of precision and overall F-score. Incorporating embedding-based features further improves performance. The explicit context-based features seem to have an ambiguous impact, in that they do not improve the performance of the SVM classifier. However, when considering the RoBERTa-based models, adding the context surrounding the word significantly improves the performance. This finding validates our initial hypothesis that there are indeed some cases where a word's complexity can be significantly impacted depending on its context.
+
+\section{In-context Ranking and Substitution}
+
+In order to accurately replace words in texts with simpler paraphrases and ensure that the generated sentences preserve the meaning of the original, we need to take into account the surrounding context. To perform this operation, we adapt the word embedding-based lexical substitution model of \cite{melamud2015simple} to the simplification task. Vector-space models have previously been shown to effectively filter PPDB paraphrases in context while preserving the meaning of the original sentences \citep{apidianaki2016vector,cocos2017word}.
+
+The substitution model proposed by \cite{melamud2015simple} (hereafter AddCos) quantifies the fit of a substitute word $s$ for a target word $t$ in a context $C$ by measuring the semantic similarity of the substitute to the target, and the similarity of the substitute to the context:
+
+\begin{equation}
+AddCos(s,t,C) = \frac{\cos(s,t) + \sum_{w \in C} \cos(s,w)}{|C|+1}
+\end{equation}
+
+The vectors $s$ and $t$ are word embeddings of the substitute and target generated by the \textit{skip-gram with negative sampling} model, which is also known as the Word2Vec model \citep{mikolov2013efficient}. The context $C$ is the set of context embeddings generated by \textit{skip-gram} for words appearing within a fixed-width window of the target $t$ in a sentence. We use a context window of 1; while this seems counter-intuitive, this is the best-performing window found in an analogous lexical substitution work \citep{cocos2017word}, and we confirm this result in Section \ref{sec:lex_experiments}. We utilize the implementation of AddCos proposed by \cite{cocos2017word}\footnote{Available at \url{https://github.com/acocos/lexsub_addcos}} with 300-dimensional word and context embeddings trained over the 4 billion words in the Annotated Gigaword corpus \citep{napoles2012annotated} using the gensim word2vec package \citep{mikolov2013efficient}.
+
+Given a set of substitution candidates, the model needs to select the ones that best preserve the meaning of target words in specific contexts. We only consider content words (nouns, verbs, adjectives and adverbs) as simplification targets. For a ``target word-substitute'' pair, we include in the model the following features which encode the strength of the semantic relationship between them:
+
+\begin{itemize}
+\item \textbf{PPDB 1.0 and 2.0 scores}, which represent the overall quality of paraphrases.
+\item \textbf{Distributional similarity scores} calculated by \cite{ganitkevitch2013ppdb} on the Google $n$-grams and the Annotated Gigaword corpora.
+\item \textbf{Independence probability}, that is the probability that there is no semantic entailment relationship between the paraphrase pair, as calculated by \cite{pavlick2015ppdb}.
+\item \textbf{SimplePPDB score} \citep{pavlick2016simple} which reflects the confidence in the simplification rule; this is used only when considering SimplePPDB paraphrases.
+\end{itemize}
+
+Again, as this work was completed prior to the rise of pre-trained language models, we additionally will compare AddCos to a BERT-based approach. Unlike with complex word identification, here we do not perform any fine-tuning. For each target word $t$ and its corresponding sentence $S$, we generate RoBERTa embeddings for $S$, and extract the vectors corresponding to $t$; here, rather than take the output of the last layer, we perform mean pooling over the last four layers similar to \cite{devlin2019bert}. Due to RoBERTa relying on subword units, in the case that $t$ is represented by multiple subwords (and thus multiple vectors), we simply perform mean pooling to combine the subword unit embeddings into a single 768-dimension vector, $e_t$. From there, for each candidate substitute word $s$, we replace the instance of $t$ in sentence $S$ with $s$, resulting in a new sentence $S^{\prime}$. From there, we again generate RoBERTa for  $S^{\prime}$, and extract a vector for $s$, $e_s$ in the same way as before. We then compute the cosine similarity between $e_t$ and $e_s$, and then rank the candidate substitutes based on their cosine similarity.
+
+\subsection{Lexical Simplification Data}
+
+In our experiments, candidate substitutes for a target word are its synonyms in WordNet \citep{miller1995wordnet}, and its paraphrases in the Paraphrase database (PPDB) \citep{ganitkevitch2013ppdb} and in SimplePPDB \citep{pavlick2016simple}. WordNet is a network that contains manually identified semantic relationships between words, which has been widely used in substitution tasks \citep{mccarthy2007semeval}. PPDB is a collection of more than 100 million English paraphrase pairs, while SimplePPDB is a subset of PPDB which contains 4.5 million simplification rules. These corpora are discussed in more detail in Section \ref{sec:lexical_review}.
+
+To evaluate the performance of our lexical simplification model, we again create a test set from the Newsela corpus. We extract lexical simplification rules from aligned parallel sentences \citep{xu2015problems} using two methods. First, we find sentence pairs with a single lexical replacement and use these word pairs as simplification instances. Next, we use a monolingual word alignment software \citep{sultan1992back} to extract all aligned word pairs. We only consider word pairs corresponding to different lemmas (i.e. words with different base forms). Through this process, we collect a test set of 14,436 word pairs.
+
+\begin{itemize}
+\item \textbf{WordNet Frequency}: We extract all WordNet synonyms for a target word $t$, and rank them in decreasing order of Google $n$-gram frequency, i.e. the most frequent synonym will be ranked first and the least frequent one will be ranked last.
+\item \textbf{SimplePPDB Score}: We extract all SimplePPDB unigram paraphrases for $t$ and rank them in decreasing order of their SimplePPDB score.
+\item \textbf{AddCos-PPDB}: We extract all PPDB synonyms for $t$ and rank them using the AddCos model described above.
+\item \textbf{RoBERTa-SimplePPDB}: We extract all SimplePPDB unigram paraphrases for $t$, and then rank the synonyms based on their contextual RoBERTa embedding similarity to $t$.
+\end{itemize}
+
+\begin{table*}
+\begin{center}
+	\footnotesize
+    \begin{tabular}{|l||c|c|c|c||c|c|c|}
+  	\hline
+& & \multicolumn{3}{c||}{\textbf{Words with $\geq$1 paraphrase} }&  \multicolumn{3}{c|}{\textbf{All words}} \\ \hline   
+\bf Model & \bf Coverage & \bf Top 1 & \bf Top 5 & \bf Oracle & \bf Top 1 & \bf Top 5 & \bf Oracle \\ \hline
+WordNet frequency & 0.911 & 0.141 & 0.267 & 0.291 & 0.129 & 0.244 & 0.265 \\
+SimplePPDB Score & 0.935 & 0.180 & 0.403 & 0.669 & 0.168 & 0.377 & 0.626 \\
+AddCos-PPDB & \bf{0.975} & 0.196 & 0.444 & \bf{0.962} & 0.191 & 0.433 & \bf{0.938} \\
+AddCos-SimplePPDB & 0.819 & \bf{0.353} & \bf{0.601} & 0.643 & \bf{0.289} & \bf{0.492} & 0.527 \\
+RoBERTa-SimplePPDB & 0.819 & 0.161 & 0.487 & 0.643 & 0.132 & 0.397 & 0.527 \\ \hline
+  \end{tabular}
+   \caption{\label{tab:lexical_eval}Performance of the lexical simplification models on the Newsela aligned test set. We present the \textbf{Coverage} of each lexico-semantic resource, the performance of each model on words with at least one paraphrase in the dataset, and the performance of each model on all words.}
+\end{center}
+\end{table*}
+
+\subsection{Experiments and Results} \label{sec:lex_experiments}
+
+We evaluate the performance of the lexical substitution model on our substitution evaluation dataset using Simple PPDB paraphrases. We retrieve the top suggestions made by our word embedding-based substitution model for a complex word in a sentence using the paraphrases of the word in SimplePPDB as our substitute pool (AddCos-SimplePPDB). We compare our method to three baselines:
+
+\begin{table}
+	\small
+	\centering
+	\begin{tabular}{|c||c|c|}
+		\hline \bf Context Window & \bf Top 1 & \bf Top 5 \\ \hline
+0 & 0.180 & 0.403 \\
+1 & \textbf{0.353} & \textbf{0.601} \\
+2 & \textbf{0.352} & 0.596 \\ 
+3 & 0.334 & 0.590 \\
+4 & 0.312 & 0.585 \\
+5 & 0.291 & 0.581 \\
+6 & 0.269 & 0.578 \\
+7 & 0.264 & 0.577 \\
+8 & 0.252 & 0.576 \\
+9 & 0.247 & 0.574 \\
+10 & 0.242 & 0.572 \\ \hline
+	\end{tabular}
+	\caption{Quality of substitutions proposed by AddCos-SimplePPDB with different context window sizes as measured using Top 1 and Top 5 accuracy on the Newsela aligned test set.}
+	\label{tab:context-window}
+\end{table}
+
+We report the results of our experiment in Table \ref{tab:lexical_eval}. For each model, we calculate Top 1 and Top 5 accuracy scores, which show how often the gold-standard simple word was proposed as the best fitting or among the 5 highest-ranked paraphrases. In addition, we calculate the upper bound performance for each dataset (PPDB, SimplePPDB and WordNet), i.e. how often the gold-standard simple word was found as a paraphrase of the target word in the dataset. This is useful in telling us how well we could potentially do, if we could perfectly rank the paraphrases. As expected, AddCos-SimplePPDB outperforms all previous baselines, even despite the lower oracle coverage when compared with using PPDB. Somewhat surprisingly, leveraging RoBERTa performed significantly worse than AddCos; this may be because the context around a word significantly impacts a word's RoBERTa embedding, and because all substitutes were put into the same context, it made it difficult to determine which was more appropriate.
+
+When performing this experiment, we also evaluated the impact of the context window size on the quality of the proposed substitutions. We varied the context window used by the \textit{AddCos-SimplePPDB} model from 0 to 10. The results of this comparison are found in Table \ref{tab:context-window}. As we can see, a context window of 1 results in the best performance, which confirms the finding from \cite{cocos2017word}. We conducted additional experiments to filter the substitution candidates using SimplePPDB confidence scores, PPDB paraphrase quality scores, and AddCos context similarity scores, but these all resulted in a non-significant change in performance, and a significant decrease in coverage.
+
+\begin{table}
+	\centering
+	\begin{tabular}{|c|c|c|c|}
+		\hline \bf Synonym Rank & \bf Good Substitution & \bf Good Simplification & \bf Both\\ \hline
+        1 & \bf 0.396 & \bf 0.280 & \bf 0.227 \\ 
+        2 & 0.311 & 0.214 & 0.153 \\ 
+        3 & 0.278 & 0.184 & 0.127 \\
+        4 & 0.228 & 0.142 & 0.093 \\ 
+        5 & 0.193 & 0.123 & 0.075 \\ \hline \hline
+        $\geq$ 1 good substitute & \bf 0.622 & \bf 0.553 & \bf 0.435 \\ \hline
+	\end{tabular}
+	\caption{Human judgments of our overall lexical simplification system. We give the proportion of substitutes the system ranked at positions 1 to 5 (i.e. from the top ranked to the fifth-ranked paraphrase in context) which was identified by a majority of workers as (a) a good substitute in context (Substitution); (b) simpler than the target word (Simplification); (c) both a good and simpler substitute (Both). We also show the proportion of complex words where at least one of the top 5 paraphrases satisfies these criteria in the last row.
+    }
+	\label{tab:lexical_overall}
+\end{table}
+
+\section{Overall Simplification System}
+
+We integrate our Complex Word Identification (CWI) classifier (\textit{SVM-context}) and the substitution model that provided the best ranking in context (\textit{AddCos-SimplePPDB}) into a simplification pipeline. The input is a complex text that needs to be simplified. The output consists of simplification suggestions for experts to choose from in order to create simpler versions of texts. The SVM-Context classifier is used to classify each content word that is not part of a named entity as either simple or complex. The lexical substitution model then gathers the SimplePPDB substitutes available for the complex target word and ranks them according to how well they fit the corresponding context. We only keep the top five suggestions made by the model as the final output.
+
+To evaluate the performance of the overall simplification system, we used the 930 texts from the Newsela corpus that were not used for training the CWI classifier. Our model identified over 170,000 complex words with paraphrases in SimplePPDB. We again asked crowdsourced annotators to evaluate the suggestions made by \textit{AddCos-SimplePPDB} for a random sample of 2,500 complex words on Amazon Mechanical Turk, in order to determine the number of good substitutions in context, the number of suggested paraphrases that are simpler than the target words, and the suggestions that are both simpler paraphrases and good in-context substitutes. Table \ref{tab:lexical_overall} shows the quality of the paraphrases ranked by our system in positions from one to five. We can see that the paraphrases our system selects as the best have a higher likelihood of being both good substitutes in context and simpler than the target word. We also show the proportion of target words that had at least one good substitute in context, one simple substitute, and one good and simple substitute.
+
+\begin{table}
+	\small
+	\centering
+	\begin{tabular}{|>{\raggedright}p{3cm}|>{\raggedright}p{5cm}|>{\raggedright}p{5cm} @{\hspace{-.5\arrayrulewidth}}c@{\hspace{-.5\arrayrulewidth}}|} \hline 
+    \bf Baseline & \bf  Simple & \bf  Complex & \\ \hline
+    $n$-gram Frequency & dug, sled, chart, lakes, push, tight, harm & estimates, frequent, attributed, isolated, preferred, liability & \\ \hline
+    Token Length & nursing, unknown, squares, feeling, teaching, strength & adorns, asylum, myriad, rigors, nutria, edible & \\ \hline
+    RF-Context & malls, hungry, therefore, hears, heavily, rainy & engaging, secular, gridlock, torrent, sanctions, lobbying & \\ \hline\hline
+    SVM-Context & peacefully, favorite, amazing, websites, harmful, somewhat & swelled, entice, tether, chaotic, vessel, midst & \\ \hline
+	\end{tabular}
+	\caption{Examples of words that were incorrectly classified by the two best performing baselines and the RF-Context model, but were correctly classified by the SVM-Context model. The last row shows examples of words that were incorrectly classified by the SVM-Context model.}
+	\label{tab:cw_examples}
+\end{table}
+
+\section{Error Analysis}
+
+In this section, we give examples of words for which our models give the correct output and the baselines fail to do so. In addition, we show examples on which our models perform poorly.
+
+In Table \ref{tab:cw_examples}, we consider examples that were incorrectly classified by each of the four best performing CWI models: the RF-Context and SVM-Context models, and the n-gram Frequency and Token Length baselines. In the first three rows, we show words that were correctly identified by SVM-Context, but incorrectly categorized by the two baselines and RF-Context; in the last row, we show words incorrectly classified by SVM-Context. We observe that the $n$-gram Frequency model tends to incorrectly classify relatively short words that are rare in the Google $n$-gram corpus as complex. On the other end, the Token Length model shows that using this feature alone leads to incorrectly identifying shorter words such as ``adorn" and ``myriad" as simple, when these words are relatively complex.
+
+\begin{table*}
+\begin{center}
+	\footnotesize
+    \begin{tabular}{|>{\raggedright}p{3cm}|>{\raggedright}p{1.3cm}|>{\raggedright}p{2.2cm}|>{\raggedright}p{1.8cm}|>{\raggedright}p{2.4cm}|>{\raggedright}p{2.1cm} @{\hspace{-.5\arrayrulewidth}}c@{\hspace{-.5\arrayrulewidth}}|} \hline
+Sentence & Gold-Standard & WordNet Frequency & SimplePPDB Score & AddCos-PPDB & AddCos-SimplePPDB & \\ \hline
+\textbf{(7.1)} Advocates \textcolor{blue}{\textbf{argue}} that including women will help end harassment of female troops. & \textcolor{red}{\textbf{say}} & reason, fence, debate, contend, indicate & \textcolor{red}{\textbf{say}}, think, tell, talk, mean & contend, assert, acknowledge, insist, complain & \textcolor{red}{\textbf{say}}, claim, believe, suggest, debate & \\ \hline
+\textbf{(7.2)} But in April , detainees covered cameras used to \textcolor{blue}{\textbf{monitor}} them. & \textcolor{red}{\textbf{watch}} & supervise, proctor, admonisher & find, meet, give, try, allow & track, manipulate, control, analyze, supervise & track, control, check, \textcolor{red}{\textbf{watch}}, follow & \\ \hline
+\textbf{(7.3)} Similarly , police can investigate cases and have the \textcolor{blue}{\textbf{authority}} to seize animals. & \textcolor{red}{\textbf{power}} & agency, potency, bureau, assurance & force, control, permission, office, limit & jurisdiction, discretion, right, prerogative, ability & \textcolor{red}{\textbf{power}}, responsibility, body, agency & \\ \hline
+  \end{tabular}
+   \caption{\label{tab:lex_examples}Examples of the top-5 substitutes for our three baselines and our best model (AddCos-SimplePPDB). We also provide the gold-standard simplification (Gold-Standard).}
+\end{center}
+\end{table*}
+
+Table \ref{tab:lex_examples} presents examples of substitution where the baseline systems did not find the correct paraphrase, but AddCos-SimplePPDB did. As we have mentioned, even when a model did not find the gold-standard paraphrase, they sometimes did find a different paraphrase that works well in the context. In Example 7.2, the top paraphrase proposed by both AddCos-PPDB and AddCos-Simple PPDB for the word ``monitor'' is ``track'', which is a reasonable substitute. On the other hand, in Example 7.3, AddCos-Simple PPDB model was able to identify a good simple substitute, when none of the other models were able to identify a suitable word with comparable complexity.
+
+\begin{table}
+\begin{center}
+	\small
+    \begin{tabular}{|>{\raggedright}p{8cm}|>{\raggedright}p{4cm} @{\hspace{-.5\arrayrulewidth}}c@{\hspace{-.5\arrayrulewidth}}|} \hline
+Sentence & Bad Substitutions & \\ \hline
+\textbf{(8.1)} Officials will offer the lunch program at \textcolor{blue}{\textbf{elementary}} schools. & basic & \\ \hline
+\textbf{(8.2)} Russian poultry is more expensive, and U.S. producers enjoy numerous cost \textcolor{blue}{\textbf{advantages}}. & prospect, benefits, revenue, merit, feature & \\ \hline
+\textbf{(8.3)} Although the calculus may be different with Syrian \textcolor{blue}{\textbf{refugees}}, the parallel for me is politics. & life, right, return, shelter, million & \\ \hline
+\textbf{(8.4)} He saw them bring in animals to a university, where they'll be cared for and put up for \textcolor{blue}{\textbf{adoption}}. & acceptance, passage, approval, endorsement & \\ \hline
+  \end{tabular}
+   \caption{\label{tab:system_examples}Examples of words and their context where our model fails to provide any good replacements.}
+\end{center}
+\end{table}
+
+Finally, Table \ref{tab:system_examples} shows examples of output of the overall simplification system. Here, the \textcolor{blue}{\textbf{blue}} word is a word that our CWI classifier identified as complex (for simplicity, we only look at one complex word per sentence). From there, we consider the five top-ranked substitutes proposed by AddCos-Simple PPDB, and show which were identified by the majority of annotators as good substitutes for the target word, simpler than the target, good simpler substitutes, and bad substitutes. After reviewing the examples where our system failed to generate acceptable substitutions for the identified complex words, we identified four main categories of errors:
+
+\begin{itemize}
+\item The identified complex term is part of a phrase and no substitution is acceptable. For example, in Example 8.1, \textit{Elementary}, \textit{Middle} or \textit{High School} is a description of the type of school. \emph{Elementary School} has an alternative name in some cases but \emph{High School} should never become \emph{Tall School}.
+\item The complex word has no simpler synonym that would be a good substitute. The difficulty of the word might reside in its meaning which can be unknown to the reader. In Example 8.3, it would be more useful to point to the definition of \emph{refugees}. 
+\item The complex word is part of a predicate with arguments that are not accessible to our model. In Example 8.4, the intended meaning of \emph{adoption}, human adoption, is hard to capture in the vicinity of the complex word. 
+\item Finally, in some cases, our annotators were quite strict in admitting a substitute. In Example 8.2, for example, \emph{cost merit} would not be syntactically correct but \emph{cost merits} would be acceptable. 
+\end{itemize}
+
+
+\section{Summary}
+\input{chapter3/summary}
+
+\biblio
+\end{document}
